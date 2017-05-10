@@ -7,11 +7,23 @@ import (
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
+	"github.com/gorilla/sessions"
+)
+
+type user struct {
+	Name string
+	Age  int
+}
+
+const (
+	sessionName         = "session-name"
+	sessionValueKeyUser = "user"
 )
 
 var (
 	loginTemplate    *template.Template
 	settingsTemplate *template.Template
+	store            = sessions.NewCookieStore([]byte("something-very-secret"))
 )
 
 func init() {
@@ -23,26 +35,48 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/login", getLoginHandler).Methods(http.MethodGet)
 	r.HandleFunc("/login", postLoginHandler).Methods(http.MethodPost)
-	r.HandleFunc("/settings", getSettingsHandler).Methods(http.MethodGet)
-	r.HandleFunc("/settings", postSettingsHandler).Methods(http.MethodPost)
+	r.HandleFunc("/settings/profile", getProfileHandler).Methods(http.MethodGet)
+	r.HandleFunc("/settings/profile", postProfileHandler).Methods(http.MethodPost)
 	r.HandleFunc("/logout", logoutHandler).Methods(http.MethodPost)
-	log.Fatal(http.ListenAndServe(":8080", csrf.Protect([]byte("32-byte-long-auth-key"))(r)))
+	protected := csrf.Protect([]byte("keep-it-secret-keep-it-safe----a"), csrf.Secure(false))(r)
+	log.Fatal(http.ListenAndServe(":8085", protected))
 
 }
 
 func getLoginHandler(w http.ResponseWriter, r *http.Request) {
-	loginTemplate.Execute(w, nil)
+	d := struct {
+		CSRF template.HTML
+	}{
+		CSRF: csrf.TemplateField(r),
+	}
+	if err := loginTemplate.Execute(w, d); err != nil {
+		panic(err)
+	}
 }
 
 func postLoginHandler(w http.ResponseWriter, r *http.Request) {
-
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+	log.Println(username, password)
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		panic(err)
+	}
+	u := &user{
+		Name: "john",
+		Age:  35,
+	}
+	session.Values[sessionValueKeyUser] = u
+	if err := session.Save(r, w); err != nil {
+		panic(err)
+	}
 }
 
-func getSettingsHandler(w http.ResponseWriter, r *http.Request) {
+func getProfileHandler(w http.ResponseWriter, r *http.Request) {
 	settingsTemplate.Execute(w, nil)
 }
 
-func postSettingsHandler(w http.ResponseWriter, r *http.Request) {
+func postProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
