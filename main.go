@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/gob"
 	"html/template"
 	"log"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/csrf"
 	"github.com/gorilla/mux"
@@ -24,9 +26,14 @@ var (
 	loginTemplate    *template.Template
 	settingsTemplate *template.Template
 	store            = sessions.NewCookieStore([]byte("something-very-secret"))
+	u                = &user{
+		Name: "john",
+		Age:  35,
+	}
 )
 
 func init() {
+	gob.Register(&user{})
 	loginTemplate = template.Must(template.ParseFiles("login.html"))
 	settingsTemplate = template.Must(template.ParseFiles("settings.html"))
 }
@@ -37,7 +44,7 @@ func main() {
 	r.HandleFunc("/login", postLoginHandler).Methods(http.MethodPost)
 	r.HandleFunc("/settings/profile", getProfileHandler).Methods(http.MethodGet)
 	r.HandleFunc("/settings/profile", postProfileHandler).Methods(http.MethodPost)
-	r.HandleFunc("/logout", logoutHandler).Methods(http.MethodPost)
+	r.HandleFunc("/logout", postLogoutHandler).Methods(http.MethodPost)
 	protected := csrf.Protect([]byte("keep-it-secret-keep-it-safe----a"), csrf.Secure(false))(r)
 	log.Fatal(http.ListenAndServe(":8085", protected))
 
@@ -62,24 +69,59 @@ func postLoginHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	u := &user{
-		Name: "john",
-		Age:  35,
+	session.Values[sessionValueKeyUser] = u
+	if err := session.Save(r, w); err != nil {
+		panic(err)
+	}
+	http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
+}
+
+func getProfileHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		panic(err)
+	}
+	u := session.Values[sessionValueKeyUser].(*user)
+	data := struct {
+		CSRF template.HTML
+		User *user
+	}{
+		User: u,
+		CSRF: csrf.TemplateField(r),
+	}
+	if err := settingsTemplate.Execute(w, data); err != nil {
+		panic(err)
+	}
+}
+
+func postProfileHandler(w http.ResponseWriter, r *http.Request) {
+	name := r.FormValue("name")
+	u.Name = name
+	age, err := strconv.Atoi(r.FormValue("age"))
+	if err != nil {
+		panic(err)
+	}
+	u.Age = age
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		panic(err)
 	}
 	session.Values[sessionValueKeyUser] = u
 	if err := session.Save(r, w); err != nil {
 		panic(err)
 	}
+	http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
 }
 
-func getProfileHandler(w http.ResponseWriter, r *http.Request) {
-	settingsTemplate.Execute(w, nil)
-}
-
-func postProfileHandler(w http.ResponseWriter, r *http.Request) {
-
-}
-
-func logoutHandler(w http.ResponseWriter, r *http.Request) {
-
+func postLogoutHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		panic(err)
+	}
+	session.Options.MaxAge = -1
+	if err := session.Save(r, w); err != nil {
+		panic(err)
+	}
+	r.URL.Path = "/"
+	http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
 }
