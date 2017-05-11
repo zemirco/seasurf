@@ -1,24 +1,18 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-  </head>
-  <body>
-    settings
-    <form method="post" action="/settings/profile">
-      {{ .CSRF }}
-      <label for="name">
-        Name
-      </label>
-      <input id="name" name="name" value="{{ .User.Name }}" type="text" />
-      <label for="age">
-        Age
-      </label>
-      <input id="age" name="age" value="{{ .User.Age }}" type="text" />
-      <button type="submit">
-        submit
-      </button>
-    </form>
-  </body>
-</html>
+
+{{ define "body" }}
+  settings
+  <form method="post" action="/settings/profile">
+    {{ .CSRF }}
+    <label for="name">
+      Name
+    </label>
+    <input id="name" name="name" value="{{ .User.Name }}" type="text" />
+    <label for="age">
+      Age
+    </label>
+    <input id="age" name="age" value="{{ .User.Age }}" type="text" />
+    <button type="submit">
+      submit
+    </button>
+  </form>
+{{ end }}

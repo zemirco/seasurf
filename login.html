@@ -1,24 +1,18 @@
-<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8">
-    <meta http-equiv="x-ua-compatible" content="ie=edge">
-  </head>
-  <body>
-    login
-    <form action="/login" method="post">
-      {{ .CSRF }}
-      <label for="username">
-        username
-      </label>
-      <input id="username" name="username" type="text" />
-      <label for="password">
-        password
-      </label>
-      <input id="password" name="password" type="password" />
-      <button type="submit">
-        submit
-      </button>
-    </form>
-  </body>
-</html>
+
+{{ define "body" }}
+  login
+  <form action="/login" method="post">
+    {{ .CSRF }}
+    <label for="username">
+      username
+    </label>
+    <input id="username" name="username" type="text" />
+    <label for="password">
+      password
+    </label>
+    <input id="password" name="password" type="password" />
+    <button type="submit">
+      submit
+    </button>
+  </form>
+{{ end }}

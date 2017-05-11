@@ -26,20 +26,17 @@ var (
 	loginTemplate    *template.Template
 	settingsTemplate *template.Template
 	store            = sessions.NewCookieStore([]byte("something-very-secret"))
-	u                = &user{
-		Name: "john",
-		Age:  35,
-	}
 )
 
 func init() {
 	gob.Register(&user{})
-	loginTemplate = template.Must(template.ParseFiles("login.html"))
-	settingsTemplate = template.Must(template.ParseFiles("settings.html"))
+	loginTemplate = template.Must(template.ParseFiles("base.html", "login.html"))
+	settingsTemplate = template.Must(template.ParseFiles("base.html", "settings.html"))
 }
 
 func main() {
 	r := mux.NewRouter()
+	r.StrictSlash(true)
 	r.HandleFunc("/login", getLoginHandler).Methods(http.MethodGet)
 	r.HandleFunc("/login", postLoginHandler).Methods(http.MethodPost)
 	r.HandleFunc("/settings/profile", getProfileHandler).Methods(http.MethodGet)
@@ -53,8 +50,10 @@ func main() {
 func getLoginHandler(w http.ResponseWriter, r *http.Request) {
 	d := struct {
 		CSRF template.HTML
+		User *user
 	}{
 		CSRF: csrf.TemplateField(r),
+		User: nil,
 	}
 	if err := loginTemplate.Execute(w, d); err != nil {
 		panic(err)
@@ -68,6 +67,10 @@ func postLoginHandler(w http.ResponseWriter, r *http.Request) {
 	session, err := store.Get(r, sessionName)
 	if err != nil {
 		panic(err)
+	}
+	u := user{
+		Name: "john",
+		Age:  35,
 	}
 	session.Values[sessionValueKeyUser] = u
 	if err := session.Save(r, w); err != nil {
@@ -95,6 +98,11 @@ func getProfileHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func postProfileHandler(w http.ResponseWriter, r *http.Request) {
+	session, err := store.Get(r, sessionName)
+	if err != nil {
+		panic(err)
+	}
+	u := session.Values[sessionValueKeyUser].(*user)
 	name := r.FormValue("name")
 	u.Name = name
 	age, err := strconv.Atoi(r.FormValue("age"))
@@ -102,10 +110,6 @@ func postProfileHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 	u.Age = age
-	session, err := store.Get(r, sessionName)
-	if err != nil {
-		panic(err)
-	}
 	session.Values[sessionValueKeyUser] = u
 	if err := session.Save(r, w); err != nil {
 		panic(err)
@@ -122,6 +126,6 @@ func postLogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if err := session.Save(r, w); err != nil {
 		panic(err)
 	}
-	r.URL.Path = "/"
+	r.URL.Path = "/login"
 	http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
 }
